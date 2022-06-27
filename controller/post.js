@@ -9,13 +9,12 @@ const createPost = async (req, res, next) => {
       title,
       location,
       image,
-      status = "waiting",
+      status = "Waiting",
       identifyMark,
       secretInformations,
       createdAt = Date.now(),
       updatedAt = Date.now(),
     } = req.body;
-    // console.log(userData);
 
     const newPost = await postModel.create({
       title: title,
@@ -42,17 +41,28 @@ const editPost = async (req, res) => {
     const { postId } = req.params;
     let { title, location, image, identifyMark, secretInformations } = req.body;
 
-    const editPost = await postModel
-      .updateOne({
-        title: title,
-        location: location,
-        image: image,
-        identifyMark: identifyMark,
-        secretInformations: secretInformations,
-        updatedAt: Date.now(),
-      })
-      .where("_id", new ObjectId(postId))
-      .andWhere("status", "waiting");
+    const post = await postModel.findOne({
+      _id: postId,
+      status: "Waiting",
+    });
+    console.log(post);
+    if (post) {
+      await postModel
+        .updateOne({
+          title: title,
+          location: location,
+          image: image,
+          identifyMark: identifyMark,
+          secretInformations: secretInformations,
+          updatedAt: Date.now(),
+        })
+        .where("_id", new ObjectId(postId));
+    } else {
+      return res.status(200).send({
+        message: "Only update post in Waiting status",
+      });
+    }
+
     return res.status(200).send({
       message: "post updated successfully",
     });
@@ -64,12 +74,12 @@ const editPost = async (req, res) => {
 const getAllPosts = async (req, res) => {
   try {
     const values = req.body.searchValue;
-    // const status = req.body.status;
+    // let { status = "Waiting" } = req.body.status;
     let data;
-    console.log(values);
+    // console.log(status);
     if (values) {
       data = await postModel
-        .find({ title: { $regex: values } })
+        .find({ title: { $regex: values } /*, status: { $in: status }*/ })
         .populate("user");
 
       console.log("data");
@@ -124,34 +134,22 @@ const getOne = async (req, res) => {
 const approvePostByAdmin = async (req, res) => {
   try {
     const { postId } = req.params;
-    console.log(postId);
-    // const data = await postModel.aggregate([
-    //   { $match: { _id: new ObjectId(postId) } },
-    //   {
-    //     $lookup: {
-    //       from: "comments",
-    //       localField: "_id",
-    //       foreignField: "post",
-    //       as: "comments",
-    //     },
-    //   },
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "user",
-    //       foreignField: "_id",
-    //       as: "users",
-    //     },
-    //   },
-    // ]);
-    const approvePost = await postModel
-      .updateOne({
-        status: "approved",
-      })
-      .where("_id", postId);
+    // console.log(postId);
+    const approvePost = await postModel.findOne({
+      status: "Waiting",
+      _id: postId,
+    });
     // console.log(approvePost);
+    if (approvePost) {
+      await postModel
+        .updateOne({
+          status: "Approved",
+        })
+        .where("_id", postId);
+    }
     return res.status(200).send({
       messages: "successfully",
+      data: approvePost,
     });
   } catch (error) {
     console.log(error);
@@ -161,14 +159,22 @@ const approvePostByAdmin = async (req, res) => {
 const updateStatusToFoundByUser = async (req, res) => {
   try {
     const { postId } = req.params;
-    const updateStatus = await postModel
-      .updateOne({
-        status: "Found",
-      })
-      .where("_id", postId);
+    const updateStatus = await postModel.findOne({
+      status: "Approved",
+      _id: postId,
+    });
+    // console.log(updateStatus);
+    if (updateStatus) {
+      await postModel
+        .updateOne({
+          status: "Found",
+        })
+        .where("_id", postId);
+    }
+
     return res.status(200).send({
       messages: "successfully",
-      data: updateStatus,
+      data: "updated",
     });
   } catch (error) {
     console.log(error);
